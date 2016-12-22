@@ -16,7 +16,9 @@ namespace NadekoBot.Modules.Administration
         public class RatelimitCommand
         {
             public static ConcurrentDictionary<ulong, Ratelimiter> RatelimitingChannels = new ConcurrentDictionary<ulong, Ratelimiter>();
-            private static Logger _log { get; }
+            private Logger _log { get; }
+
+            private ShardedDiscordClient _client { get; }
 
             public class Ratelimiter
             {
@@ -59,11 +61,12 @@ namespace NadekoBot.Modules.Administration
                 }
             }
 
-            static RatelimitCommand()
+            public RatelimitCommand()
             {
-               _log = LogManager.GetCurrentClassLogger();
+                this._client = NadekoBot.Client;
+                this._log = LogManager.GetCurrentClassLogger();
 
-               NadekoBot.Client.MessageReceived += (umsg) =>
+               _client.MessageReceived += (umsg) =>
                 {
                     var t = Task.Run(async () =>
                     {
@@ -94,7 +97,7 @@ namespace NadekoBot.Modules.Administration
                 if (RatelimitingChannels.TryRemove(channel.Id, out throwaway))
                 {
                     throwaway.cancelSource.Cancel();
-                    await channel.SendConfirmAsync("ℹ️ Slow mode disabled.").ConfigureAwait(false);
+                    await channel.SendMessageAsync("ℹ️ **Slow mode disabled.**").ConfigureAwait(false);
                     return;
                 }
             }
@@ -109,7 +112,7 @@ namespace NadekoBot.Modules.Administration
 
                 if (msg < 1 || perSec < 1 || msg > 100 || perSec > 3600)
                 {
-                    await channel.SendErrorAsync("⚠️ Invalid parameters.");
+                    await channel.SendMessageAsync("⚠️ `Invalid parameters.`");
                     return;
                 }
                 var toAdd = new Ratelimiter()
@@ -120,8 +123,8 @@ namespace NadekoBot.Modules.Administration
                 };
                 if(RatelimitingChannels.TryAdd(channel.Id, toAdd))
                 {
-                    await channel.SendConfirmAsync("Slow mode initiated",
-                                                $"Users can't send more than `{toAdd.MaxMessages} message(s)` every `{toAdd.PerSeconds} second(s)`.")
+                    await channel.SendMessageAsync("✅ **Slow mode initiated: " +
+                                                $"Users can't send more than `{toAdd.MaxMessages} message(s)` every `{toAdd.PerSeconds} second(s)`.**")
                                                 .ConfigureAwait(false);
                 }
             }

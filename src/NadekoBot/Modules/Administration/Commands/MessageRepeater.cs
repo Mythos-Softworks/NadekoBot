@@ -2,7 +2,6 @@
 using Discord.Commands;
 using Discord.WebSocket;
 using NadekoBot.Attributes;
-using NadekoBot.Extensions;
 using NadekoBot.Services;
 using NadekoBot.Services.Database.Models;
 using NLog;
@@ -19,7 +18,7 @@ namespace NadekoBot.Modules.Administration
         [Group]
         public class RepeatCommands
         {
-            public static ConcurrentDictionary<ulong, RepeatRunner> repeaters { get; }
+            public ConcurrentDictionary<ulong, RepeatRunner> repeaters;
 
             public class RepeatRunner
             {
@@ -71,7 +70,7 @@ namespace NadekoBot.Modules.Administration
                 }
             }
 
-            static RepeatCommands()
+            public RepeatCommands()
             {
                 using (var uow = DbHandler.UnitOfWork())
                 {
@@ -89,7 +88,7 @@ namespace NadekoBot.Modules.Administration
                 RepeatRunner rep;
                 if (!repeaters.TryGetValue(channel.Id, out rep))
                 {
-                    await channel.SendErrorAsync("ℹ️ **No repeating message found on this server.**").ConfigureAwait(false);
+                    await channel.SendMessageAsync("ℹ️ **No repeating message found on this server.**").ConfigureAwait(false);
                     return;
                 }
                 rep.Reset();
@@ -111,10 +110,10 @@ namespace NadekoBot.Modules.Administration
                         await uow.CompleteAsync();
                     }
                     rep.Stop();
-                    await channel.SendConfirmAsync("✅ **Stopped repeating a message.**").ConfigureAwait(false);
+                    await channel.SendMessageAsync("✅ **Stopped repeating a message.**").ConfigureAwait(false);
                 }
                 else
-                    await channel.SendConfirmAsync("ℹ️ **No message is repeating.**").ConfigureAwait(false);
+                    await channel.SendMessageAsync("ℹ️ **No message is repeating.**").ConfigureAwait(false);
             }
 
             [NadekoCommand, Usage, Description, Aliases]
@@ -160,7 +159,7 @@ namespace NadekoBot.Modules.Administration
                     return old;
                 });
 
-                await channel.SendConfirmAsync($"🔁 Repeating **\"{rep.Repeater.Message}\"** every `{rep.Repeater.Interval.Days} day(s), {rep.Repeater.Interval.Hours} hour(s) and {rep.Repeater.Interval.Minutes} minute(s)`.").ConfigureAwait(false);
+                await channel.SendMessageAsync($"🔁 Repeating **\"{rep.Repeater.Message}\"** every `{rep.Repeater.Interval.Days} day(s), {rep.Repeater.Interval.Hours} hour(s) and {rep.Repeater.Interval.Minutes} minute(s)`.").ConfigureAwait(false);
             }
         }
     }

@@ -24,34 +24,27 @@ namespace NadekoBot.Modules.Music.Classes
         public string Query { get; set; }
         public string Title { get; set; }
         public string Uri { get; set; }
-	public string AlbumArt { get; set; }
     }
     public class Song
     {
-	public StreamState State { get; set; }
+        public StreamState State { get; set; }
         public string PrettyName =>
-            $"**{SongInfo.Title.TrimTo(55)} `{(SongInfo.Provider ?? "-")} by {QueuerName}`**";
-	    //$"{SongInfo.Title.TrimTo(70)}";
+            $"**【 {SongInfo.Title.TrimTo(55)} 】**`{(SongInfo.Provider ?? "-")}` `by {QueuerName}`";
         public SongInfo SongInfo { get; }
-        public MusicPlayer MusicPlayer { get; set; }
-		
-		public string PrettyUser =>
-            $"{QueuerName}";
         public string QueuerName { get; set; }
-		
-		public string PrettyProvider =>
-            $"{(SongInfo.Provider ?? "No Provider")}";
+
+        public MusicPlayer MusicPlayer { get; set; }
 
         public string PrettyCurrentTime()
         {
             var time = TimeSpan.FromSeconds(bytesSent / 3840 / 50);
-            var str = $"{(int)time.TotalMinutes}m {time.Seconds}s / ";
+            var str = $"【{(int)time.TotalMinutes}m {time.Seconds}s】**/** ";
             if (TotalLength == TimeSpan.Zero)
                 str += "**?**";
             else if (TotalLength == TimeSpan.MaxValue)
                 str += "**∞**";
             else
-                str += $"{(int)TotalLength.TotalMinutes}m {TotalLength.Seconds}s";
+                str += $"【{(int)TotalLength.TotalMinutes}m {TotalLength.Seconds}s】";
             return str;
         }
 
@@ -320,7 +313,6 @@ namespace NadekoBot.Modules.Music.Classes
                         Uri = svideo.StreamLink,
                         ProviderType = musicType,
                         Query = svideo.TrackLink,
-			AlbumArt = svideo.artwork_url,
                     })
                     { TotalLength = TimeSpan.FromMilliseconds(svideo.Duration) };
                 }
@@ -335,7 +327,6 @@ namespace NadekoBot.Modules.Music.Classes
                         Uri = svideo.StreamLink,
                         ProviderType = MusicType.Normal,
                         Query = svideo.TrackLink,
-			AlbumArt = svideo.artwork_url,
                     })
                     { TotalLength = TimeSpan.FromMilliseconds(svideo.Duration) };
                 }

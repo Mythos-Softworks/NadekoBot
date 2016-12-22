@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using NadekoBot.Modules.Permissions;
-using System;
 
 namespace NadekoBot.Services.Database.Repositories.Impl
 {
@@ -22,7 +21,6 @@ namespace NadekoBot.Services.Database.Repositories.Impl
                     .ThenInclude(gc => gc.Previous)
                 .Include(gc => gc.RootPermission)
                     .ThenInclude(gc => gc.Next)
-                .Include(gc => gc.MutedUsers)
                 .Include(gc => gc.GenerateCurrencyChannelIds)
                 .Include(gc => gc.FilterInvitesChannelIds)
                 .Include(gc => gc.FilterWordsChannelIds)
@@ -35,30 +33,20 @@ namespace NadekoBot.Services.Database.Repositories.Impl
         /// </summary>
         /// <param name="guildId"></param>
         /// <returns></returns>
-        public GuildConfig For(ulong guildId, Func<DbSet<GuildConfig>, IQueryable<GuildConfig>> includes = null)
+        public GuildConfig For(ulong guildId)
         {
-            GuildConfig config;
-
-            if (includes == null)
-            {
-                config = _set
-                                .Include(gc => gc.FollowedStreams)
-                                 .Include(gc => gc.LogSetting)
-                                    .ThenInclude(ls => ls.IgnoredChannels)
-                                .Include(gc => gc.LogSetting)
-                                    .ThenInclude(ls => ls.IgnoredVoicePresenceChannelIds)
-                                .Include(gc => gc.FilterInvitesChannelIds)
-                                .Include(gc => gc.FilterWordsChannelIds)
-                                .Include(gc => gc.FilteredWords)
-                                .Include(gc => gc.GenerateCurrencyChannelIds)
-                                .Include(gc => gc.CommandCooldowns)
-                                .FirstOrDefault(c => c.GuildId == guildId);
-            }
-            else
-            {
-                var set = includes(_set);
-                config = set.FirstOrDefault(c => c.GuildId == guildId);
-            }
+            var config = _set
+                            .Include(gc => gc.FollowedStreams)
+                             .Include(gc => gc.LogSetting)
+                                .ThenInclude(ls => ls.IgnoredChannels)
+                            .Include(gc => gc.LogSetting)
+                                .ThenInclude(ls => ls.IgnoredVoicePresenceChannelIds)
+                            .Include(gc => gc.FilterInvitesChannelIds)
+                            .Include(gc => gc.FilterWordsChannelIds)
+                            .Include(gc => gc.FilteredWords)
+                            .Include(gc => gc.GenerateCurrencyChannelIds)
+                            .Include(gc => gc.CommandCooldowns)
+                            .FirstOrDefault(c => c.GuildId == guildId);
 
             if (config == null)
             {
@@ -122,7 +110,9 @@ namespace NadekoBot.Services.Database.Repositories.Impl
 
         public GuildConfig SetNewRootPermission(ulong guildId, Permission p)
         {
-            var data = PermissionsFor(guildId);
+            var data = _set
+                        .Include(gc => gc.RootPermission)
+                        .FirstOrDefault(gc => gc.GuildId == guildId);
 
             data.RootPermission.Prepend(p);
             data.RootPermission = p;

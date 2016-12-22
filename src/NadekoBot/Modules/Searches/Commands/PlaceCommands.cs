@@ -1,7 +1,6 @@
 ﻿using Discord;
 using Discord.Commands;
 using NadekoBot.Attributes;
-using NadekoBot.Extensions;
 using NadekoBot.Services;
 using System;
 using System.Threading.Tasks;
@@ -37,7 +36,7 @@ namespace NadekoBot.Modules.Searches
             {
                 var channel = (ITextChannel)imsg.Channel;
 
-                await channel.SendConfirmAsync(typesStr)
+                await channel.SendMessageAsync(typesStr)
                              .ConfigureAwait(false);
             }
 

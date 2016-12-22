@@ -17,16 +17,17 @@ namespace NadekoBot.Modules.Administration
         [Group]
         public class ServerGreetCommands
         {
-            private static Logger _log { get; }
+            public static long Greeted = 0;
+            private Logger _log;
 
-            static ServerGreetCommands()
+            public ServerGreetCommands()
             {
                 NadekoBot.Client.UserJoined += UserJoined;
                 NadekoBot.Client.UserLeft += UserLeft;
                 _log = LogManager.GetCurrentClassLogger();
             }
 
-            private static Task UserLeft(IGuildUser user)
+            private Task UserLeft(IGuildUser user)
             {
                 var leftTask = Task.Run(async () =>
                 {
@@ -35,7 +36,7 @@ namespace NadekoBot.Modules.Administration
                         GuildConfig conf;
                         using (var uow = DbHandler.UnitOfWork())
                         {
-                            conf = uow.GuildConfigs.For(user.Guild.Id, set => set);
+                            conf = uow.GuildConfigs.For(user.Guild.Id);
                         }
 
                         if (!conf.SendChannelByeMessage) return;
@@ -66,7 +67,7 @@ namespace NadekoBot.Modules.Administration
                 return Task.CompletedTask;
             }
 
-            private static Task UserJoined(IGuildUser user)
+            private Task UserJoined(IGuildUser user)
             {
                 var joinedTask = Task.Run(async () =>
                 {
@@ -75,7 +76,7 @@ namespace NadekoBot.Modules.Administration
                         GuildConfig conf;
                         using (var uow = DbHandler.UnitOfWork())
                         {
-                            conf = uow.GuildConfigs.For(user.Guild.Id, set => set);
+                            conf = uow.GuildConfigs.For(user.Guild.Id);
                         }
 
                         if (conf.SendChannelGreetMessage)
@@ -112,7 +113,7 @@ namespace NadekoBot.Modules.Administration
                                 var msg = conf.DmGreetMessageText.Replace("%user%", user.Username).Replace("%server%", user.Guild.Name);
                                 if (!string.IsNullOrWhiteSpace(msg))
                                 {
-                                    await channel.SendConfirmAsync(msg).ConfigureAwait(false);
+                                    await channel.SendMessageAsync(msg).ConfigureAwait(false);
                                 }
                             }
                         }
@@ -134,9 +135,9 @@ namespace NadekoBot.Modules.Administration
                 await ServerGreetCommands.SetGreetDel(channel.Guild.Id, timer).ConfigureAwait(false);
 
                 if (timer > 0)
-                    await channel.SendConfirmAsync($"🆗 Greet messages **will be deleted** after `{timer} seconds`.").ConfigureAwait(false);
+                    await channel.SendMessageAsync($"🆗 Greet messages **will be deleted** after `{timer} seconds`.").ConfigureAwait(false);
                 else
-                    await channel.SendConfirmAsync("ℹ️ Automatic deletion of greet messages has been **disabled**.").ConfigureAwait(false);
+                    await channel.SendMessageAsync("ℹ️ Automatic deletion of greet messages has been **disabled**.").ConfigureAwait(false);
             }
 
             private static async Task SetGreetDel(ulong id, int timer)
@@ -146,9 +147,9 @@ namespace NadekoBot.Modules.Administration
                 
                 using (var uow = DbHandler.UnitOfWork())
                 {
-                    var conf = uow.GuildConfigs.For(id, set => set);
+                    var conf = uow.GuildConfigs.For(id);
                     conf.AutoDeleteGreetMessagesTimer = timer;
-
+                    uow.GuildConfigs.Update(conf);
                     await uow.CompleteAsync().ConfigureAwait(false);
                 }
             }
@@ -163,9 +164,9 @@ namespace NadekoBot.Modules.Administration
                 var enabled = await ServerGreetCommands.SetGreet(channel.Guild.Id, channel.Id).ConfigureAwait(false);
 
                 if (enabled)
-                    await channel.SendConfirmAsync("✅ Greeting messages **enabled** on this channel.").ConfigureAwait(false);
+                    await channel.SendMessageAsync("✅ Greeting messages **enabled** on this channel.").ConfigureAwait(false);
                 else
-                    await channel.SendConfirmAsync("ℹ️ Greeting messages **disabled**.").ConfigureAwait(false);
+                    await channel.SendMessageAsync("ℹ️ Greeting messages **disabled**.").ConfigureAwait(false);
             }
 
             private static async Task<bool> SetGreet(ulong guildId, ulong channelId, bool? value = null)
@@ -173,10 +174,10 @@ namespace NadekoBot.Modules.Administration
                 bool enabled;
                 using (var uow = DbHandler.UnitOfWork())
                 {
-                    var conf = uow.GuildConfigs.For(guildId, set => set);
+                    var conf = uow.GuildConfigs.For(guildId);
                     enabled = conf.SendChannelGreetMessage = value ?? !conf.SendChannelGreetMessage;
                     conf.GreetMessageChannelId = channelId;
-
+                    uow.GuildConfigs.Update(conf);
                     await uow.CompleteAsync().ConfigureAwait(false);
                 }
                 return enabled;
@@ -191,20 +192,20 @@ namespace NadekoBot.Modules.Administration
 
                 if (string.IsNullOrWhiteSpace(text))
                 {
-                    string channelGreetMessageText;
+                    GuildConfig config;
                     using (var uow = DbHandler.UnitOfWork())
                     {
-                        channelGreetMessageText = uow.GuildConfigs.For(channel.Guild.Id, set => set).ChannelGreetMessageText;
+                        config = uow.GuildConfigs.For(channel.Guild.Id);
                     }
-                    await channel.SendConfirmAsync("Current greet message: ", channelGreetMessageText?.SanitizeMentions());
+                    await channel.SendMessageAsync("ℹ️ Current **greet** message: `" + config.ChannelGreetMessageText?.SanitizeMentions() + "`");
                     return;
                 }
 
                 var sendGreetEnabled = ServerGreetCommands.SetGreetMessage(channel.Guild.Id, ref text);
 
-                await channel.SendConfirmAsync("🆗 New greet message **set**.").ConfigureAwait(false);
+                await channel.SendMessageAsync("🆗 New greet message **set**.").ConfigureAwait(false);
                 if (!sendGreetEnabled)
-                    await channel.SendConfirmAsync("ℹ️ Enable greet messsages by typing `.greet`").ConfigureAwait(false);
+                    await channel.SendMessageAsync("ℹ️ Enable greet messsages by typing `.greet`").ConfigureAwait(false);
             }
 
             public static bool SetGreetMessage(ulong guildId, ref string message)
@@ -217,10 +218,11 @@ namespace NadekoBot.Modules.Administration
                 bool greetMsgEnabled;
                 using (var uow = DbHandler.UnitOfWork())
                 {
-                    var conf = uow.GuildConfigs.For(guildId, set => set);
+                    var conf = uow.GuildConfigs.For(guildId);
                     conf.ChannelGreetMessageText = message;
                     greetMsgEnabled = conf.SendChannelGreetMessage;
 
+                    uow.GuildConfigs.Update(conf);
                     uow.Complete();
                 }
                 return greetMsgEnabled;
@@ -236,9 +238,9 @@ namespace NadekoBot.Modules.Administration
                 var enabled = await ServerGreetCommands.SetGreetDm(channel.Guild.Id).ConfigureAwait(false);
 
                 if (enabled)
-                    await channel.SendConfirmAsync("🆗 DM Greet announcements **enabled**.").ConfigureAwait(false);
+                    await channel.SendMessageAsync("🆗 DM Greet announcements **enabled**.").ConfigureAwait(false);
                 else
-                    await channel.SendConfirmAsync("ℹ️ Greet announcements **disabled**.").ConfigureAwait(false);
+                    await channel.SendMessageAsync("ℹ️ Greet announcements **disabled**.").ConfigureAwait(false);
             }
 
             private static async Task<bool> SetGreetDm(ulong guildId, bool? value = null)
@@ -246,9 +248,9 @@ namespace NadekoBot.Modules.Administration
                 bool enabled;
                 using (var uow = DbHandler.UnitOfWork())
                 {
-                    var conf = uow.GuildConfigs.For(guildId, set => set);
+                    var conf = uow.GuildConfigs.For(guildId);
                     enabled = conf.SendDmGreetMessage = value ?? !conf.SendDmGreetMessage;
-
+                    uow.GuildConfigs.Update(conf);
                     await uow.CompleteAsync().ConfigureAwait(false);
                 }
                 return enabled;
@@ -268,15 +270,15 @@ namespace NadekoBot.Modules.Administration
                     {
                         config = uow.GuildConfigs.For(channel.Guild.Id);
                     }
-                    await channel.SendConfirmAsync("ℹ️ Current **DM greet** message: `" + config.DmGreetMessageText?.SanitizeMentions() + "`");
+                    await channel.SendMessageAsync("ℹ️ Current **DM greet** message: `" + config.DmGreetMessageText?.SanitizeMentions() + "`");
                     return;
                 }
 
                 var sendGreetEnabled = ServerGreetCommands.SetGreetDmMessage(channel.Guild.Id, ref text);
 
-                await channel.SendConfirmAsync("🆗 New DM greet message **set**.").ConfigureAwait(false);
+                await channel.SendMessageAsync("🆗 New DM greet message **set**.").ConfigureAwait(false);
                 if (!sendGreetEnabled)
-                    await channel.SendConfirmAsync($"ℹ️ Enable DM greet messsages by typing `{NadekoBot.ModulePrefixes[typeof(Administration).Name]}greetdm`").ConfigureAwait(false);
+                    await channel.SendMessageAsync($"ℹ️ Enable DM greet messsages by typing `{NadekoBot.ModulePrefixes[typeof(Administration).Name]}greetdm`").ConfigureAwait(false);
             }
 
             public static bool SetGreetDmMessage(ulong guildId, ref string message)
@@ -293,6 +295,7 @@ namespace NadekoBot.Modules.Administration
                     conf.DmGreetMessageText = message;
                     greetMsgEnabled = conf.SendDmGreetMessage;
 
+                    uow.GuildConfigs.Update(conf);
                     uow.Complete();
                 }
                 return greetMsgEnabled;
@@ -308,9 +311,9 @@ namespace NadekoBot.Modules.Administration
                 var enabled = await ServerGreetCommands.SetBye(channel.Guild.Id, channel.Id).ConfigureAwait(false);
 
                 if (enabled)
-                    await channel.SendConfirmAsync("✅ Bye announcements **enabled** on this channel.").ConfigureAwait(false);
+                    await channel.SendMessageAsync("✅ Bye announcements **enabled** on this channel.").ConfigureAwait(false);
                 else
-                    await channel.SendConfirmAsync("ℹ️ Bye announcements **disabled**.").ConfigureAwait(false);
+                    await channel.SendMessageAsync("ℹ️ Bye announcements **disabled**.").ConfigureAwait(false);
             }
 
             private static async Task<bool> SetBye(ulong guildId, ulong channelId, bool? value = null)
@@ -318,10 +321,10 @@ namespace NadekoBot.Modules.Administration
                 bool enabled;
                 using (var uow = DbHandler.UnitOfWork())
                 {
-                    var conf = uow.GuildConfigs.For(guildId, set => set);
+                    var conf = uow.GuildConfigs.For(guildId);
                     enabled = conf.SendChannelByeMessage = value ?? !conf.SendChannelByeMessage;
                     conf.ByeMessageChannelId = channelId;
-
+                    uow.GuildConfigs.Update(conf);
                     await uow.CompleteAsync();
                 }
                 return enabled;
@@ -336,20 +339,20 @@ namespace NadekoBot.Modules.Administration
 
                 if (string.IsNullOrWhiteSpace(text))
                 {
-                    string byeMessageText;
+                    GuildConfig config;
                     using (var uow = DbHandler.UnitOfWork())
                     {
-                        byeMessageText = uow.GuildConfigs.For(channel.Guild.Id, set => set).ChannelByeMessageText;
+                        config = uow.GuildConfigs.For(channel.Guild.Id);
                     }
-                    await channel.SendConfirmAsync("ℹ️ Current **bye** message: `" + byeMessageText?.SanitizeMentions() + "`");
+                    await channel.SendMessageAsync("ℹ️ Current **bye** message: `" + config.ChannelByeMessageText?.SanitizeMentions() + "`");
                     return;
                 }
 
                 var sendByeEnabled = ServerGreetCommands.SetByeMessage(channel.Guild.Id, ref text);
 
-                await channel.SendConfirmAsync("🆗 New bye message **set**.").ConfigureAwait(false);
+                await channel.SendMessageAsync("🆗 New bye message **set**.").ConfigureAwait(false);
                 if (!sendByeEnabled)
-                    await channel.SendConfirmAsync($"ℹ️ Enable bye messsages by typing `{NadekoBot.ModulePrefixes[typeof(Administration).Name]}bye`").ConfigureAwait(false);
+                    await channel.SendMessageAsync($"ℹ️ Enable bye messsages by typing `{NadekoBot.ModulePrefixes[typeof(Administration).Name]}bye`").ConfigureAwait(false);
             }
             
             public static bool SetByeMessage(ulong guildId, ref string message)
@@ -362,10 +365,11 @@ namespace NadekoBot.Modules.Administration
                 bool byeMsgEnabled;
                 using (var uow = DbHandler.UnitOfWork())
                 {
-                    var conf = uow.GuildConfigs.For(guildId, set => set);
+                    var conf = uow.GuildConfigs.For(guildId);
                     conf.ChannelByeMessageText = message;
                     byeMsgEnabled = conf.SendChannelByeMessage;
 
+                    uow.GuildConfigs.Update(conf);
                     uow.Complete();
                 }
                 return byeMsgEnabled;
@@ -381,9 +385,9 @@ namespace NadekoBot.Modules.Administration
                 await ServerGreetCommands.SetByeDel(channel.Guild.Id, timer).ConfigureAwait(false);
 
                 if (timer > 0)
-                    await channel.SendConfirmAsync($"🆗 Bye messages **will be deleted** after `{timer} seconds`.").ConfigureAwait(false);
+                    await channel.SendMessageAsync($"🆗 Bye messages **will be deleted** after `{timer} seconds`.").ConfigureAwait(false);
                 else
-                    await channel.SendConfirmAsync("ℹ️ Automatic deletion of bye messages has been **disabled**.").ConfigureAwait(false);
+                    await channel.SendMessageAsync("ℹ️ Automatic deletion of bye messages has been **disabled**.").ConfigureAwait(false);
             }
 
             private static async Task SetByeDel(ulong id, int timer)
@@ -393,9 +397,9 @@ namespace NadekoBot.Modules.Administration
 
                 using (var uow = DbHandler.UnitOfWork())
                 {
-                    var conf = uow.GuildConfigs.For(id, set => set);
+                    var conf = uow.GuildConfigs.For(id);
                     conf.AutoDeleteByeMessagesTimer = timer;
-
+                    uow.GuildConfigs.Update(conf);
                     await uow.CompleteAsync().ConfigureAwait(false);
                 }
             }

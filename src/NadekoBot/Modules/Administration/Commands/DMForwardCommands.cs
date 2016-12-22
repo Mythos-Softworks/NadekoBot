@@ -1,7 +1,6 @@
 ﻿using Discord;
 using Discord.Commands;
 using NadekoBot.Attributes;
-using NadekoBot.Extensions;
 using NadekoBot.Services;
 using System.Collections.Generic;
 using System.Linq;
@@ -40,9 +39,9 @@ namespace NadekoBot.Modules.Administration
                     uow.Complete();
                 }
                 if (ForwardDMs)
-                    await channel.SendConfirmAsync("✅ **I will forward DMs from now on.**").ConfigureAwait(false);
+                    await channel.SendMessageAsync("✅ **I will forward DMs from now on.**").ConfigureAwait(false);
                 else
-                    await channel.SendConfirmAsync("🆗 **I will stop forwarding DMs from now on.**").ConfigureAwait(false);
+                    await channel.SendMessageAsync("🆗 **I will stop forwarding DMs from now on.**").ConfigureAwait(false);
             }
 
             [NadekoCommand, Usage, Description, Aliases]
@@ -58,9 +57,9 @@ namespace NadekoBot.Modules.Administration
                     uow.Complete();
                 }
                 if (ForwardDMsToAllOwners)
-                    await channel.SendConfirmAsync("ℹ️ **I will forward DMs to all owners.**").ConfigureAwait(false);
+                    await channel.SendMessageAsync("ℹ️ **I will forward DMs to all owners.**").ConfigureAwait(false);
                 else
-                    await channel.SendConfirmAsync("ℹ️ **I will forward DMs only to the first owner.**").ConfigureAwait(false);
+                    await channel.SendMessageAsync("ℹ️ **I will forward DMs only to the first owner.**").ConfigureAwait(false);
 
             }
 
@@ -68,17 +67,17 @@ namespace NadekoBot.Modules.Administration
             {
                 if (ForwardDMs && ownerChannels.Any())
                 {
-                    var title = $"DM from [{msg.Author}]({msg.Author.Id})";
+                    var toSend = $"```markdown\n I received a message from [{msg.Author}]({msg.Author.Id}): {msg.Content}```";
                     if (ForwardDMsToAllOwners)
                     {
                         var msgs = await Task.WhenAll(ownerChannels.Where(ch => ch.Recipient.Id != msg.Author.Id)
-                                                                   .Select(ch => ch.SendConfirmAsync(title, msg.Content))).ConfigureAwait(false);
+                                                                   .Select(ch => ch.SendMessageAsync(toSend))).ConfigureAwait(false);
                     }
                     else
                     {
                         var firstOwnerChannel = ownerChannels.First();
                         if (firstOwnerChannel.Recipient.Id != msg.Author.Id)
-                            try { await firstOwnerChannel.SendConfirmAsync(title, msg.Content).ConfigureAwait(false); } catch { }
+                            try { await firstOwnerChannel.SendMessageAsync(toSend).ConfigureAwait(false); } catch { }
                     }
                 }
             }

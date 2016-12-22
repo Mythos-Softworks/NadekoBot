@@ -16,7 +16,7 @@ namespace NadekoBot.Modules.Administration
         [Group]
         public class CrossServerTextChannel
         {
-            static CrossServerTextChannel()
+            public CrossServerTextChannel()
             {
                 _log = LogManager.GetCurrentClassLogger();
                 NadekoBot.Client.MessageReceived += (imsg) =>
@@ -50,11 +50,11 @@ namespace NadekoBot.Modules.Administration
                 };
             }
 
-            private static string GetText(IGuild server, ITextChannel channel, IGuildUser user, IUserMessage message) =>
+            private string GetText(IGuild server, ITextChannel channel, IGuildUser user, IUserMessage message) =>
                 $"**{server.Name} | {channel.Name}** `{user.Username}`: " + message.Content;
             
             public static readonly ConcurrentDictionary<int, ConcurrentHashSet<ITextChannel>> Subscribers = new ConcurrentDictionary<int, ConcurrentHashSet<ITextChannel>>();
-            private static Logger _log { get; }
+            private Logger _log { get; }
 
             [NadekoCommand, Usage, Description, Aliases]
             [RequireContext(ContextType.Guild)]
@@ -67,7 +67,7 @@ namespace NadekoBot.Modules.Administration
                 if (Subscribers.TryAdd(token, set))
                 {
                     set.Add(channel);
-                    await ((IGuildUser)msg.Author).SendConfirmAsync("This is your CSC token", token.ToString()).ConfigureAwait(false);
+                    await ((IGuildUser)msg.Author).SendMessageAsync("This is your CSC token:" + token.ToString()).ConfigureAwait(false);
                 }
             }
 
@@ -82,7 +82,7 @@ namespace NadekoBot.Modules.Administration
                 if (!Subscribers.TryGetValue(token, out set))
                     return;
                 set.Add(channel);
-                await channel.SendConfirmAsync("Joined cross server channel.").ConfigureAwait(false);
+                await channel.SendMessageAsync(":ok:").ConfigureAwait(false);
             }
 
             [NadekoCommand, Usage, Description, Aliases]
@@ -96,7 +96,7 @@ namespace NadekoBot.Modules.Administration
                 {
                     subscriber.Value.TryRemove(channel);
                 }
-                await channel.SendMessageAsync("Left cross server channel.").ConfigureAwait(false);
+                await channel.SendMessageAsync(":ok:").ConfigureAwait(false);
             }
         }
     }

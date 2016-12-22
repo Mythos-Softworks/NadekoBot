@@ -109,7 +109,7 @@ namespace NadekoBot.Modules.Administration
                     var byeMsg = (string)reader["ByeText"];
                     var grdel = false;
                     var byedel = grdel;
-                    var gc = uow.GuildConfigs.For(gid, set => set);
+                    var gc = uow.GuildConfigs.For(gid);
 
                     if (greetDM)
                         gc.SendDmGreetMessage = greet;

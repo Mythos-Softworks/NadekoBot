@@ -60,11 +60,8 @@
   },
   "configurations": {
     "GlobalNadeko": {
-      "buildOptions": {
-        "define": [ "GLOBAL_NADEKO" ],
-        "nowarn": [ "CS1573", "CS1591" ],
-        "optimize": true
-      }
+      "buildOptions": { "define": [ "GLOBAL_NADEKO" ] },
+      "compilationOptions": { "optimize": true }
     }
   }
 }

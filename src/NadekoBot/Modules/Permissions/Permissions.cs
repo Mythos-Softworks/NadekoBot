@@ -7,7 +7,6 @@ using NadekoBot.Services;
 using Discord;
 using NadekoBot.Services.Database.Models;
 using System.Collections.Concurrent;
-using NadekoBot.Extensions;
 
 namespace NadekoBot.Modules.Permissions
 {
@@ -22,7 +21,7 @@ namespace NadekoBot.Modules.Permissions
         }
 
         //guildid, root permission
-        public static ConcurrentDictionary<ulong, PermissionCache> Cache { get; }
+        public static ConcurrentDictionary<ulong, PermissionCache> Cache;
 
         static Permissions()
         {
@@ -40,7 +39,7 @@ namespace NadekoBot.Modules.Permissions
             }
         }
 
-        public Permissions() : base()
+        public Permissions(ILocalization loc, CommandService cmds, ShardedDiscordClient client) : base(loc, cmds, client)
         {
         }
 
@@ -52,7 +51,7 @@ namespace NadekoBot.Modules.Permissions
 
             using (var uow = DbHandler.UnitOfWork())
             {
-                var config = uow.GuildConfigs.For(channel.Guild.Id, set => set);
+                var config = uow.GuildConfigs.For(channel.Guild.Id);
                 config.VerbosePermissions = action.Value;
                 Cache.AddOrUpdate(channel.Guild.Id, new PermissionCache()
                 {
@@ -63,7 +62,7 @@ namespace NadekoBot.Modules.Permissions
                 await uow.CompleteAsync().ConfigureAwait(false);
             }
 
-            await channel.SendConfirmAsync("ℹ️ I will " + (action.Value ? "now" : "no longer") + " show permission warnings.").ConfigureAwait(false);
+            await channel.SendMessageAsync("ℹ️ I will " + (action.Value ? "now" : "no longer") + " show permission warnings.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -73,10 +72,10 @@ namespace NadekoBot.Modules.Permissions
             var channel = (ITextChannel)msg.Channel;
             using (var uow = DbHandler.UnitOfWork())
             {
-                var config = uow.GuildConfigs.For(channel.Guild.Id, set => set);
+                var config = uow.GuildConfigs.For(channel.Guild.Id);
                 if (role == null)
                 {
-                    await channel.SendConfirmAsync($"ℹ️ Current permission role is **{config.PermissionRole}**.").ConfigureAwait(false);
+                    await channel.SendMessageAsync($"ℹ️ Current permission role is **{config.PermissionRole}**.").ConfigureAwait(false);
                     return;
                 }
                 else {
@@ -91,7 +90,7 @@ namespace NadekoBot.Modules.Permissions
                 }
             }
 
-            await channel.SendConfirmAsync($"Users now require **{role.Name}** role in order to edit permissions.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"✅ Users now require **{role.Name}** role in order to edit permissions.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -110,7 +109,10 @@ namespace NadekoBot.Modules.Permissions
                 toSend = Format.Code($"📄 Permissions page {page}") + "\n\n" + String.Join("\n", perms.AsEnumerable().Skip((page - 1) * 20).Take(20).Select(p => $"`{(i++)}.` {(p.Next == null ? Format.Bold(p.GetCommand(channel.Guild) + " [uneditable]") : (p.GetCommand(channel.Guild)))}"));
             }
 
-            await channel.SendMessageAsync(toSend).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(toSend))
+                await channel.SendMessageAsync("❗️`No permissions set.`").ConfigureAwait(false);
+            else
+                await channel.SendMessageAsync(toSend).ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -154,11 +156,11 @@ namespace NadekoBot.Modules.Permissions
                     uow2._context.SaveChanges();
                 }
 
-                await channel.SendConfirmAsync($"✅ {imsg.Author.Mention} removed permission **{p.GetCommand(channel.Guild)}** from position #{index + 1}.").ConfigureAwait(false);
+                await channel.SendMessageAsync($"✅ {imsg.Author.Mention} removed permission **{p.GetCommand(channel.Guild)}** from position #{index + 1}.").ConfigureAwait(false);
             }
             catch (ArgumentOutOfRangeException)
             {
-                await channel.SendErrorAsync("❗️`No command on that index found.`").ConfigureAwait(false);
+                await channel.SendMessageAsync("❗️`No command on that index found.`").ConfigureAwait(false);
             }
         }
 
@@ -206,13 +208,13 @@ namespace NadekoBot.Modules.Permissions
                         {
                             if (!fromFound)
                             {
-                                await channel.SendErrorAsync($"Can't find permission at index `#{++from}`").ConfigureAwait(false);
+                                await channel.SendMessageAsync($"❗️`Can't find permission at index `#{++from}`").ConfigureAwait(false);
                                 return;
                             }
 
                             if (!toFound)
                             {
-                                await channel.SendErrorAsync($"Can't find permission at index `#{++to}`").ConfigureAwait(false);
+                                await channel.SendMessageAsync($"❗️`Can't find permission at index `#{++to}`").ConfigureAwait(false);
                                 return;
                             }
                         }
@@ -262,14 +264,14 @@ namespace NadekoBot.Modules.Permissions
                         }, (id, old) => { old.RootPermission = config.RootPermission; return old; });
                         await uow.CompleteAsync().ConfigureAwait(false);
                     }
-                    await channel.SendConfirmAsync($"`Moved permission:` \"{fromPerm.GetCommand(channel.Guild)}\" `from #{++from} to #{++to}.`").ConfigureAwait(false);
+                    await channel.SendMessageAsync($"✅ `Moved permission:` \"{fromPerm.GetCommand(channel.Guild)}\" `from #{++from} to #{++to}.`").ConfigureAwait(false);
                     return;
                 }
                 catch (Exception e) when (e is ArgumentOutOfRangeException || e is IndexOutOfRangeException)
                 {
                 }
             }
-            await channel.SendErrorAsync("`Invalid index(es) specified.`").ConfigureAwait(false);
+            await channel.SendMessageAsync("`Invalid index(es) specified.`").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -298,7 +300,7 @@ namespace NadekoBot.Modules.Permissions
 
                 await uow.CompleteAsync().ConfigureAwait(false);
             }
-            await channel.SendConfirmAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{command.Text}` command on this server.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{command.Text}` command on this server.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -326,7 +328,7 @@ namespace NadekoBot.Modules.Permissions
                 }, (id, old) => { old.RootPermission = config.RootPermission; return old; });
                 await uow.CompleteAsync().ConfigureAwait(false);
             }
-            await channel.SendConfirmAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of **`{module.Name}`** module on this server.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of **`{module.Name}`** module on this server.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -354,7 +356,7 @@ namespace NadekoBot.Modules.Permissions
                 }, (id, old) => { old.RootPermission = config.RootPermission; return old; });
                 await uow.CompleteAsync().ConfigureAwait(false);
             }
-            await channel.SendConfirmAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{command.Text}` command for `{user}` user.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{command.Text}` command for `{user}` user.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -382,7 +384,7 @@ namespace NadekoBot.Modules.Permissions
                 }, (id, old) => { old.RootPermission = config.RootPermission; return old; });
                 await uow.CompleteAsync().ConfigureAwait(false);
             }
-            await channel.SendConfirmAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{module.Name}` module for `{user}` user.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{module.Name}` module for `{user}` user.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -410,7 +412,7 @@ namespace NadekoBot.Modules.Permissions
                 }, (id, old) => { old.RootPermission = config.RootPermission; return old; });
                 await uow.CompleteAsync().ConfigureAwait(false);
             }
-            await channel.SendConfirmAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{command.Text}` command for `{role}` role.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{command.Text}` command for `{role}` role.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -438,7 +440,7 @@ namespace NadekoBot.Modules.Permissions
                 }, (id, old) => { old.RootPermission = config.RootPermission; return old; });
                 await uow.CompleteAsync().ConfigureAwait(false);
             }
-            await channel.SendConfirmAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{module.Name}` module for `{role}` role.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{module.Name}` module for `{role}` role.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -469,9 +471,9 @@ namespace NadekoBot.Modules.Permissions
                 }
             }
             catch (Exception ex) {
-                _log.Error(ex);
+                Console.WriteLine(ex);
             }
-            await channel.SendConfirmAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{command.Text}` command for `{chnl}` channel.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{command.Text}` command for `{chnl}` channel.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -499,7 +501,7 @@ namespace NadekoBot.Modules.Permissions
                 }, (id, old) => { old.RootPermission = config.RootPermission; return old; });
                 await uow.CompleteAsync().ConfigureAwait(false);
             }
-            await channel.SendConfirmAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{module.Name}` module for `{chnl}` channel.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `{module.Name}` module for `{chnl}` channel.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -527,7 +529,7 @@ namespace NadekoBot.Modules.Permissions
                 }, (id, old) => { old.RootPermission = config.RootPermission; return old; });
                 await uow.CompleteAsync().ConfigureAwait(false);
             }
-            await channel.SendConfirmAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `ALL MODULES` for `{chnl}` channel.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `ALL MODULES` for `{chnl}` channel.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -555,7 +557,7 @@ namespace NadekoBot.Modules.Permissions
                 }, (id, old) => { old.RootPermission = config.RootPermission; return old; });
                 await uow.CompleteAsync().ConfigureAwait(false);
             }
-            await channel.SendConfirmAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `ALL MODULES` for `{role}` role.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `ALL MODULES` for `{role}` role.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -583,7 +585,7 @@ namespace NadekoBot.Modules.Permissions
                 }, (id, old) => { old.RootPermission = config.RootPermission; return old; });
                 await uow.CompleteAsync().ConfigureAwait(false);
             }
-            await channel.SendConfirmAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `ALL MODULES` for `{user}` user.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `ALL MODULES` for `{user}` user.").ConfigureAwait(false);
         }
 
         [NadekoCommand, Usage, Description, Aliases]
@@ -622,7 +624,7 @@ namespace NadekoBot.Modules.Permissions
                 }, (id, old) => { old.RootPermission = config.RootPermission; return old; });
                 await uow.CompleteAsync().ConfigureAwait(false);
             }
-            await channel.SendConfirmAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `ALL MODULES` on this server.").ConfigureAwait(false);
+            await channel.SendMessageAsync($"{(action.Value ? "✅ Allowed" : "🆗 Denied")} usage of `ALL MODULES` on this server.").ConfigureAwait(false);
         }
     }
 }
